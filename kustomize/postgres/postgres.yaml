@@ -3,16 +3,30 @@ kind: PostgresCluster
 metadata:
   name: hippo
 spec:
-  image: registry.developers.crunchydata.com/crunchydata/crunchy-postgres:ubi8-15.5-0
+  image: registry.developers.crunchydata.com/crunchydata/crunchy-postgres:ubi8-15.1-0
   postgresVersion: 15
   instances:
     - name: instance1
+      replicas: 3
       dataVolumeClaimSpec:
         accessModes:
         - "ReadWriteOnce"
         resources:
           requests:
-            storage: 1Gi
+            storage: 80Gi
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                postgres-operator.crunchydata.com/cluster: hippo
+                postgres-operator.crunchydata.com/instance-set: instance1
+            topologyKey: "kubernetes.io/hostname"
+  users:
+    - name: rcs-user
+      databases:
+        - rcs-db
+      options: 'SUPERUSER'
   backups:
     pgbackrest:
       image: registry.developers.crunchydata.com/crunchydata/crunchy-pgbackrest:ubi8-2.47-2
@@ -25,3 +39,13 @@ spec:
             resources:
               requests:
                 storage: 1Gi
+  patroni:
+    dynamicConfiguration:
+      postgresql:
+        parameters:
+          max_connections: "100"
+        recovery_conf:
+          restore_command: "cp /var/lib/postgresql/wal_archive/%f %p"
+      loop_wait: 5  # Lower this value to check more frequently
+      ttl: 5        # Lower this value to detect leader failure faster
+      retry_timeout: 5  # Lower this value for quicker retries

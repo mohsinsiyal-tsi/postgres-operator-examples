@@ -1,0 +1,33 @@
+
+kubectl apply -k kustomize/install/namespace
+kubectl apply --server-side -k kustomize/install/default
+kubectl -n postgres-operator get pods \
+  --selector=postgres-operator.crunchydata.com/control-plane=postgres-operator \
+  --field-selector=status.phase=Running
+
+kubectl apply -k kustomize/postgres
+
+k get pod -n postgres-operator -L postgres-operator.crunchydata.com/role -l postgres-operator.crunchydata.com/instance
+
+# Get password
+kubectl -n postgres-operator get secrets hippo-pguser-rcs-user -o go-template='{{.data.password | base64decode}}'
+
+
+host is hippo-primary.postgres-operator.svc.cluster.local
+
+
+
+Force deleting:
+
+kubectl get namespace <namespace-name> -o json | jq '.spec.finalizers'
+
+kubectl api-resources --verbs=list --namespaced -o name | xargs -n 1 kubectl get --show-kind --ignore-not-found -n <namespace-name>
+
+kubectl get <resource-type> <resource-name> -n <namespace-name> -o json | jq '.metadata.finalizers = []' | kubectl replace -f -
+
+
+kubectl get pod <pod-name> -n <namespace-name> -o json | jq '.metadata.finalizers = []' | kubectl replace -f -
+
+kubectl delete <resource-type> <resource-name> -n <namespace-name> --grace-period=0 --force
+
+kubectl get namespace <namespace-name> -o json | jq '.spec.finalizers = []' | kubectl replace -f -
